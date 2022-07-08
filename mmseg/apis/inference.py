@@ -9,7 +9,7 @@ from mmseg.datasets.pipelines import Compose
 from mmseg.models import build_segmentor
 
 
-def init_segmentor(config, checkpoint=None, device='cuda:0'):
+def init_segmentor(config, checkpoint=None, device='cuda:0', palette=None):
     """Initialize a segmentor from config file.
 
     Args:
@@ -33,7 +33,7 @@ def init_segmentor(config, checkpoint=None, device='cuda:0'):
     if checkpoint is not None:
         checkpoint = load_checkpoint(model, checkpoint, map_location='cpu')
         model.CLASSES = checkpoint['meta']['CLASSES']
-        model.PALETTE = checkpoint['meta']['PALETTE']
+        model.PALETTE = palette
     model.cfg = config  # save the config in the model for convenience
     model.to(device)
     model.eval()

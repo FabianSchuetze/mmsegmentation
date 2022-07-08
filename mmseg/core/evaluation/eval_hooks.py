@@ -54,9 +54,9 @@ class EvalHook(_EvalHook):
         self.latest_results = results
         runner.log_buffer.clear()
         runner.log_buffer.output['eval_iter_num'] = len(self.dataloader)
-        key_score = self.evaluate(runner, results)
-        if self.save_best:
-            self._save_ckpt(runner, key_score)
+        # key_score = self.evaluate(runner, results)
+        # if self.save_best:
+            # self._save_ckpt(runner, key_score)
 
 
 class DistEvalHook(_DistEvalHook):

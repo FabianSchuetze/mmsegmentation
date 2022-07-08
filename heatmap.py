@@ -1,13 +1,14 @@
-import mmcv
+import sys
 import os.path as osp
-import numpy as np
-import random
-from PIL import Image
-import wandb
-wandb.login()
+import mmcv
+import copy
+from mmseg.datasets import build_dataset
+from mmseg.models import build_segmentor
+from mmseg.apis import train_segmentor
+from mmseg.datasets.builder import DATASETS
+from mmseg.datasets.custom import CustomDataset
 # convert dataset annotation to semantic segmentation map
-data_root =\
-'/home/schuetze/Documents/data/heatmap/scenes_item_0062995_winkelstrebe_D30-90_automatica_small/'
+data_root =sys.argv[1]
 img_dir = 'images'
 ann_dir = 'labels'
 classes = ('bridge',)
@@ -15,22 +16,20 @@ palette = [[128, 128, 128]]
 # define class and plaette for better visualization
 
 # split train/val set randomly
-split_dir = 'splits'
-mmcv.mkdir_or_exist(osp.join(data_root, split_dir))
-filename_list = [osp.splitext(filename)[0] for filename in mmcv.scandir(
-    osp.join(data_root, ann_dir), suffix='.png')]
-random.shuffle(filename_list)
-with open(osp.join(data_root, split_dir, 'train.txt'), 'w') as f:
-  # select first 4/5 as train set
-  train_length = int(len(filename_list)*5/6)
-  f.writelines(line + '\n' for line in filename_list[:train_length])
-with open(osp.join(data_root, split_dir, 'val.txt'), 'w') as f:
-  # select last 1/5 as train set
-  f.writelines(line + '\n' for line in filename_list[train_length:])
+# split_dir = 'splits'
+# mmcv.mkdir_or_exist(osp.join(data_root, split_dir))
+# filename_list = [osp.splitext(filename)[0] for filename in mmcv.scandir(
+    # osp.join(data_root, ann_dir), suffix='.png')]
+# random.shuffle(filename_list)
+# with open(osp.join(data_root, split_dir, 'train.txt'), 'w') as f:
+  # # select first 4/5 as train set
+  # train_length = int(len(filename_list)*5/6)
+  # f.writelines(line + '\n' for line in filename_list[:train_length])
+# with open(osp.join(data_root, split_dir, 'val.txt'), 'w') as f:
+  # # select last 1/5 as train set
+  # f.writelines(line + '\n' for line in filename_list[train_length:])
 
 
-from mmseg.datasets.builder import DATASETS
-from mmseg.datasets.custom import CustomDataset
 
 @DATASETS.register_module()
 class Bridge(CustomDataset):
@@ -43,7 +42,7 @@ class Bridge(CustomDataset):
 
 from mmcv import Config
 cfg =\
-Config.fromfile('../mmsegmentation/configs/segformer/segformer_mit-b0_8x1_1024x1024_160k_cityscapes.py')
+Config.fromfile('configs/segformer/segformer_mit-b0_8x1_1024x1024_160k_cityscapes.py')
 
 from mmseg.apis import set_random_seed
 
@@ -59,7 +58,7 @@ cfg.model.decode_head.loss_decode = \
 cfg.dataset_type = 'Bridge'
 cfg.data_root = data_root
 
-cfg.data.samples_per_gpu = 4
+cfg.data.samples_per_gpu = 2
 cfg.data.workers_per_gpu=0
 
 cfg.img_norm_cfg = dict(
@@ -78,10 +77,11 @@ cfg.train_pipeline = [
 
 cfg.test_pipeline = [
     dict(type='LoadImageFromFile'),
+    # dict(type='LoadAnnotations'),
     # dict(type='Resize', img_scale=(320, 240), ratio_range=(0.5, 2.0)),
     dict(
        type='MultiScaleFlipAug',
-        img_scale=(1280, 960),
+        img_scale=(960, 720),
         flip=False,
         transforms=[
             dict(type='Normalize', **cfg.img_norm_cfg),
@@ -105,7 +105,7 @@ cfg.data.val.data_root = cfg.data_root
 cfg.data.val.img_dir = img_dir
 cfg.data.val.ann_dir = ann_dir
 cfg.data.val.pipeline = cfg.test_pipeline
-cfg.data.val.split = 'splits/val.txt'
+cfg.data.val.split = 'splits/val_new.txt'
 
 cfg.data.test.type = cfg.dataset_type
 cfg.data.test.data_root = cfg.data_root
@@ -122,7 +122,7 @@ cfg.data.test.split = 'splits/val.txt'
 cfg.work_dir = './work_dirs/tutorial'
 
 cfg.runner.max_iters = 200
-cfg.log_config.interval = 100
+cfg.log_config.interval = 2
 # cfg.log_config.hooks.append(
         # dict(type='MMSegWandbHook',
          # init_kwargs={'project': 'MMDetection-tutorial'},
@@ -137,10 +137,11 @@ cfg.log_config.interval = 100
          # num_eval_images=1,
          # interval=10))
 cfg.evaluation.interval = 2
+# cfg.evaluation.metric = None
 cfg.evaluation.pre_eval = False
 cfg.evaluation.out_dir = '/tmp/'
 # cfg.evaluation.num_eval_images = 2
-cfg.checkpoint_config.interval = 200
+cfg.checkpoint_config.interval = 500
 
 # Set seed to facitate reproducing the result
 cfg.seed = 0
@@ -149,20 +150,22 @@ cfg.gpu_ids = range(1)
 
 # Let's have a look at the final config used for training
 
-from mmseg.datasets import build_dataset
-from mmseg.models import build_segmentor
-from mmseg.apis import train_segmentor
 
 
 # Build the dataset
 datasets = [build_dataset(cfg.data.train)]
+# datasets = [build_dataset(cfg.data.train)]
 
 # Build the detector
-model = build_segmentor(cfg.model)
 # Add an attribute for visualization convenience
-model.CLASSES = datasets[0].CLASSES
-
+cfg.workflow = [('train', 1), ('val', 1)]
+if len(cfg.workflow) == 2:
+  val_dataset = copy.deepcopy(cfg.data.val)
+  val_dataset.pipeline = cfg.data.train.pipeline
+  datasets.append(build_dataset(val_dataset))
 # Create work_dir
+model = build_segmentor(cfg.model)
+model.CLASSES = datasets[0].CLASSES
 mmcv.mkdir_or_exist(osp.abspath(cfg.work_dir))
 train_segmentor(model, datasets, cfg, distributed=False, validate=True,
                 meta=dict())
