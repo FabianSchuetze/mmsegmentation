@@ -17,18 +17,18 @@ palette = [[128, 128, 128]]
 # define class and plaette for better visualization
 
 # split train/val set randomly
-split_dir = 'splits'
-mmcv.mkdir_or_exist(osp.join(data_root, split_dir))
-filename_list = [osp.splitext(filename)[0] for filename in mmcv.scandir(
-    osp.join(data_root, ann_dir), suffix='.png')]
-random.shuffle(filename_list)
-with open(osp.join(data_root, split_dir, 'train.txt'), 'w') as f:
-  # select first 4/5 as train set
-  train_length = int(len(filename_list)*5/6)
-  f.writelines(line + '\n' for line in filename_list[:train_length])
-with open(osp.join(data_root, split_dir, 'val.txt'), 'w') as f:
-  # select last 1/5 as train set
-  f.writelines(line + '\n' for line in filename_list[train_length:])
+# split_dir = 'splits'
+# mmcv.mkdir_or_exist(osp.join(data_root, split_dir))
+# filename_list = [osp.splitext(filename)[0] for filename in mmcv.scandir(
+    # osp.join(data_root, ann_dir), suffix='.png')]
+# random.shuffle(filename_list)
+# with open(osp.join(data_root, split_dir, 'train.txt'), 'w') as f:
+  # # select first 4/5 as train set
+  # train_length = int(len(filename_list)*95/100)
+  # f.writelines(line + '\n' for line in filename_list[:train_length])
+# with open(osp.join(data_root, split_dir, 'val.txt'), 'w') as f:
+  # # select last 1/5 as train set
+  # f.writelines(line + '\n' for line in filename_list[train_length:])
 
 
 
@@ -51,7 +51,7 @@ from mmseg.apis import set_random_seed
 # Since we use only one GPU, BN is used instead of SyncBN
 cfg.norm_cfg = dict(type='BN', requires_grad=True)
 cfg.device = 'cpu'
-cfg.model.decode_head.num_classes = 1
+cfg.model.decode_head.num_classes = 2
 # cfg.model.decode_head.loss_decode = \
     # dict(type='MyLoss', loss_weight=1.0)
 
@@ -61,18 +61,23 @@ cfg.dataset_type = 'Bridge'
 cfg.data_root = data_root
 
 cfg.data.samples_per_gpu = 1
-cfg.data.workers_per_gpu=1
+cfg.data.workers_per_gpu=0
 
 cfg.img_norm_cfg = dict(
     mean=[0.0, 0.0, 0.0], std=[255.0, 255.0, 255.0], to_rgb=True)
 
+img_scale=(720, 960)
 cfg.train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations'),
-    dict(type='Resize', img_scale=(960, 720)),
+    dict(type='Resize', img_scale=(2048, 512), ratio_range=(0.5, 2.0)),
+    # dict(type='Resize', img_scale=(1024, 960), ratio_range=(0.5, 2.0)),
+    # dict(type='Resize', img_scale=(960, 720)),
+    dict(type='RandomCrop', crop_size=img_scale, cat_max_ratio=0.75),
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(type='PhotoMetricDistortion'),
     dict(type='Normalize', **cfg.img_norm_cfg),
+    dict(type='Pad', size=img_scale, pad_val=0, seg_pad_val=255),
     dict(type='DefaultFormatBundle'),
     dict(type='Collect', keys=['img', 'gt_semantic_seg']),
 ]
@@ -83,9 +88,10 @@ cfg.test_pipeline = [
     # dict(type='Resize', img_scale=(320, 240), ratio_range=(0.5, 2.0)),
     dict(
        type='MultiScaleFlipAug',
-        img_scale=(960, 720),
+        img_scale=img_scale,
         flip=False,
         transforms=[
+            dict(type='Resize', keep_ratio=True),
             dict(type='Normalize', **cfg.img_norm_cfg),
             dict(type='ImageToTensor', keys=['img']),
             dict(type='Collect', keys=['img']),
@@ -138,13 +144,16 @@ cfg.log_config.interval = 2
          # log_checkpoint=True,
          # num_eval_images=1,
          # interval=10))
-cfg.evaluation.interval = 2
+cfg.evaluation.interval = 20
 # cfg.evaluation.metric = None
 cfg.evaluation.pre_eval = False
 cfg.evaluation.out_dir = '/tmp/'
 # cfg.evaluation.num_eval_images = 2
 cfg.checkpoint_config.interval = 500
-# cfg.optimizer['lr'] = 0.001
+cfg.checkpoint_config.meta = dict(
+        CLASSES=classes,
+        PALETTE=palette)
+cfg.optimizer['lr'] = 0.00006 * cfg.data.samples_per_gpu / 8
 # optimizer = dict(type='Adam', lr=0.0002)
 
 # Set seed to facitate reproducing the result
@@ -157,7 +166,7 @@ cfg.gpu_ids = range(1)
 
 
 # Build the dataset
-datasets = [build_dataset(cfg.data.train)]
+# datasets = [build_dataset(cfg.data.train)]
 # datasets = [build_dataset(cfg.data.train)]
 
 # Build the detector
@@ -171,5 +180,5 @@ if len(cfg.workflow) == 2:
 model = build_segmentor(cfg.model)
 model.CLASSES = datasets[0].CLASSES
 mmcv.mkdir_or_exist(osp.abspath(cfg.work_dir))
-train_segmentor(model, datasets, cfg, distributed=False, validate=True,
-                meta=dict())
+# train_segmentor(model, datasets, cfg, distributed=False, validate=True,
+                # meta=dict())
