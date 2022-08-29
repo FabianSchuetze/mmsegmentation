@@ -70,6 +70,7 @@ img_scale=(720, 960)
 cfg.train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations'),
+    dict(type='MyAugmentations'),
     dict(type='Resize', img_scale=(2048, 512), ratio_range=(0.5, 2.0)),
     # dict(type='Resize', img_scale=(1024, 960), ratio_range=(0.5, 2.0)),
     # dict(type='Resize', img_scale=(960, 720)),
@@ -131,12 +132,12 @@ cfg.work_dir = './work_dirs/tutorial'
 
 cfg.runner.max_iters = 200
 cfg.log_config.interval = 2
-# cfg.log_config.hooks.append(
-        # dict(type='MMSegWandbHook',
-         # init_kwargs={'project': 'MMDetection-tutorial'},
-         # log_checkpoint=True,
-         # num_eval_images=1,
-         # interval=10))
+cfg.log_config.hooks.append(
+        dict(type='MMSegWandbHook',
+         init_kwargs={'project': 'MMDetection-tutorial'},
+         log_checkpoint=True,
+         num_eval_images=1,
+         interval=10))
 # cfg.evaluation.hooks.append(
         # dict(type='EvalHook'))
          # init_kwargs={'project': 'MMDetection-tutorial'},
@@ -167,7 +168,7 @@ cfg.gpu_ids = range(1)
 
 # Build the dataset
 # datasets = [build_dataset(cfg.data.train)]
-# datasets = [build_dataset(cfg.data.train)]
+datasets = [build_dataset(cfg.data.train)]
 
 # Build the detector
 # Add an attribute for visualization convenience
@@ -175,10 +176,10 @@ cfg.workflow = [('train', 1), ('val', 1)]
 if len(cfg.workflow) == 2:
   val_dataset = copy.deepcopy(cfg.data.val)
   val_dataset.pipeline = cfg.data.train.pipeline
-  datasets.append(build_dataset(val_dataset))
+  # datasets.append(build_dataset(val_dataset))
 # Create work_dir
 model = build_segmentor(cfg.model)
 model.CLASSES = datasets[0].CLASSES
 mmcv.mkdir_or_exist(osp.abspath(cfg.work_dir))
-# train_segmentor(model, datasets, cfg, distributed=False, validate=True,
-                # meta=dict())
+train_segmentor(model, datasets, cfg, distributed=False, validate=True,
+                meta=dict())
