@@ -17,18 +17,18 @@ palette = [[128, 128, 128]]
 # define class and plaette for better visualization
 
 # split train/val set randomly
-# split_dir = 'splits'
-# mmcv.mkdir_or_exist(osp.join(data_root, split_dir))
-# filename_list = [osp.splitext(filename)[0] for filename in mmcv.scandir(
-    # osp.join(data_root, ann_dir), suffix='.png')]
-# random.shuffle(filename_list)
-# with open(osp.join(data_root, split_dir, 'train.txt'), 'w') as f:
-  # # select first 4/5 as train set
-  # train_length = int(len(filename_list)*95/100)
-  # f.writelines(line + '\n' for line in filename_list[:train_length])
-# with open(osp.join(data_root, split_dir, 'val.txt'), 'w') as f:
-  # # select last 1/5 as train set
-  # f.writelines(line + '\n' for line in filename_list[train_length:])
+split_dir = 'splits'
+mmcv.mkdir_or_exist(osp.join(data_root, split_dir))
+filename_list = [osp.splitext(filename)[0] for filename in mmcv.scandir(
+    osp.join(data_root, ann_dir), suffix='.png')]
+random.shuffle(filename_list)
+with open(osp.join(data_root, split_dir, 'train.txt'), 'w') as f:
+  # select first 4/5 as train set
+  train_length = int(len(filename_list)*95/100)
+  f.writelines(line + '\n' for line in filename_list[:train_length])
+with open(osp.join(data_root, split_dir, 'val.txt'), 'w') as f:
+  # select last 1/5 as train set
+  f.writelines(line + '\n' for line in filename_list[train_length:])
 
 
 
@@ -43,7 +43,8 @@ class Bridge(CustomDataset):
 
 from mmcv import Config
 cfg =\
-Config.fromfile('configs/segformer/segformer_mit-b0_512x512_160k_ade20k.py')
+Config.fromfile('configs/convnext/upernet_convnext_tiny_fp16_512x512_160k_ade20k.py')
+# Config.fromfile('configs/segformer/segformer_mit-b0_512x512_160k_ade20k.py')
 # Config.fromfile('configs/sem_fpn/fpn_r101_512x512_160k_ade20k.py')
 
 from mmseg.apis import set_random_seed
@@ -135,9 +136,9 @@ cfg.log_config.interval = 2
 cfg.log_config.hooks.append(
         dict(type='MMSegWandbHook',
          init_kwargs={'project': 'MMDetection-tutorial'},
-         log_checkpoint=True,
+         log_checkpoint=False,
          num_eval_images=1,
-         interval=10))
+         interval=2))
 # cfg.evaluation.hooks.append(
         # dict(type='EvalHook'))
          # init_kwargs={'project': 'MMDetection-tutorial'},
@@ -145,7 +146,7 @@ cfg.log_config.hooks.append(
          # log_checkpoint=True,
          # num_eval_images=1,
          # interval=10))
-cfg.evaluation.interval = 20
+cfg.evaluation.interval = 2
 # cfg.evaluation.metric = None
 cfg.evaluation.pre_eval = False
 cfg.evaluation.out_dir = '/tmp/'
@@ -154,7 +155,7 @@ cfg.checkpoint_config.interval = 500
 cfg.checkpoint_config.meta = dict(
         CLASSES=classes,
         PALETTE=palette)
-cfg.optimizer['lr'] = 0.00006 * cfg.data.samples_per_gpu / 8
+cfg.optimizer['lr'] = cfg.optimizer['lr'] * cfg.data.samples_per_gpu / 8
 # optimizer = dict(type='Adam', lr=0.0002)
 
 # Set seed to facitate reproducing the result
