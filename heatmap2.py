@@ -12,8 +12,8 @@ import random
 data_root =sys.argv[1]
 img_dir = 'images'
 ann_dir = 'labels'
-classes = ('bridge',)
-palette = [[128, 128, 128]]
+classes = ('background', 'bridge',)
+palette = [[0,0,0], [128, 128, 128]]
 # define class and plaette for better visualization
 
 # split train/val set randomly
@@ -32,7 +32,7 @@ with open(osp.join(data_root, split_dir, 'val.txt'), 'w') as f:
 
 
 
-#@DATASETS.register_module()
+@DATASETS.register_module()
 class Bridge(CustomDataset):
   CLASSES = classes
   PALETTE = palette
@@ -55,8 +55,9 @@ cfg.model.decode_head.norm_cfg = dict(type='BN', requires_grad=True)
 cfg.model.auxiliary_head.norm_cfg = dict(type='BN', requires_grad=True)
 cfg.device = 'cuda'
 cfg.model.decode_head.num_classes = 2
-# cfg.model.decode_head.loss_decode = \
-    # dict(type='MyLoss', loss_weight=1.0)
+# cfg.model.decode_head.loss_decode.use_sigmoid = True
+cfg.model.decode_head.loss_decode = \
+    dict(type='TverskyLoss', loss_weight=1.0)
 
 
 # Modify dataset type and path
@@ -138,7 +139,7 @@ cfg.log_config.interval = 400
 cfg.log_config.hooks.append(
         dict(type='MMSegWandbHook',
          init_kwargs={'project': 'MMDetection-tutorial'},
-         log_checkpoint=False,
+         log_checkpoint=True,
          num_eval_images=1,
          interval=400))
 # cfg.evaluation.hooks.append(
@@ -150,7 +151,7 @@ cfg.log_config.hooks.append(
          # interval=10))
 cfg.evaluation.interval = 400
 # cfg.evaluation.metric = None
-cfg.evaluation.pre_eval = False
+cfg.evaluation.pre_eval = True
 cfg.evaluation.out_dir = '/tmp/'
 # cfg.evaluation.num_eval_images = 2
 cfg.checkpoint_config.interval = 500
