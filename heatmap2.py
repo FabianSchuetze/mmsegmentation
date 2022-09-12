@@ -4,7 +4,7 @@ import mmcv
 import copy
 from mmseg.datasets import build_dataset
 from mmseg.models import build_segmentor
-from mmseg.apis import train_segmentor
+from mmseg.apis import train_segmentor, init_segmentor
 from mmseg.datasets.builder import DATASETS
 from mmseg.datasets.custom import CustomDataset
 import random
@@ -52,7 +52,7 @@ from mmseg.apis import set_random_seed
 # Since we use only one GPU, BN is used instead of SyncBN
 cfg.norm_cfg = dict(type='BN', requires_grad=True)
 cfg.model.decode_head.norm_cfg = dict(type='BN', requires_grad=True)
-cfg.model.auxiliary_head.norm_cfg = dict(type='BN', requires_grad=True)
+use_covnext = True
 cfg.device = 'cuda'
 cfg.model.decode_head.num_classes = 2
 # cfg.model.decode_head.loss_decode.use_sigmoid = True
@@ -70,7 +70,7 @@ cfg.data.workers_per_gpu=4
 cfg.img_norm_cfg = dict(
     mean=[0.0, 0.0, 0.0], std=[255.0, 255.0, 255.0], to_rgb=True)
 
-img_scale=(720, 960)
+crop_size=(720, 720)
 cfg.train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations'),
@@ -78,11 +78,11 @@ cfg.train_pipeline = [
     dict(type='Resize', img_scale=(2048, 512), ratio_range=(0.5, 2.0)),
     # dict(type='Resize', img_scale=(1024, 960), ratio_range=(0.5, 2.0)),
     # dict(type='Resize', img_scale=(960, 720)),
-    dict(type='RandomCrop', crop_size=img_scale, cat_max_ratio=0.75),
+    dict(type='RandomCrop', crop_size=crop_size, cat_max_ratio=0.95),
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(type='PhotoMetricDistortion'),
     dict(type='Normalize', **cfg.img_norm_cfg),
-    dict(type='Pad', size=img_scale, pad_val=0, seg_pad_val=255),
+    dict(type='Pad', size=crop_size, pad_val=0, seg_pad_val=255),
     dict(type='DefaultFormatBundle'),
     dict(type='Collect', keys=['img', 'gt_semantic_seg']),
 ]
@@ -93,7 +93,7 @@ cfg.test_pipeline = [
     # dict(type='Resize', img_scale=(320, 240), ratio_range=(0.5, 2.0)),
     dict(
        type='MultiScaleFlipAug',
-        img_scale=img_scale,
+        img_scale=crop_size,
         flip=False,
         transforms=[
             dict(type='Resize', keep_ratio=True),
@@ -103,7 +103,14 @@ cfg.test_pipeline = [
         ])
     # dict(type='LoadAnnotations'),
 ]
-cfg.model.test_cfg.mode = 'whole'
+if use_covnext:
+    cfg.model.auxiliary_head.num_classes = 2
+    cfg.model.test_cfg['crop_size'] = crop_size
+    cfg.model.test_cfg['stride'] = (640, 640)
+    cfg.model.auxiliary_head.norm_cfg = dict(type='BN', requires_grad=True)
+else:
+    cfg.model.test_cfg.mode = 'whole'
+# cfg.model.test_cfg.mode = 'whole'
 
 
 cfg.data.train.type = cfg.dataset_type
@@ -185,6 +192,7 @@ if len(cfg.workflow) == 2:
 model = build_segmentor(cfg.model)
 model.CLASSES = datasets[0].CLASSES
 mmcv.mkdir_or_exist(osp.abspath(cfg.work_dir))
-train_segmentor(model, datasets, cfg, distributed=False, validate=True,
-                meta=dict())
+model = init_segmentor(cfg, 'iter_600.pth')
+# train_segmentor(model, datasets, cfg, distributed=False, validate=True,
+                # meta=dict())
 
