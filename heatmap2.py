@@ -8,6 +8,7 @@ from mmseg.apis import train_segmentor, init_segmentor
 from mmseg.datasets.builder import DATASETS
 from mmseg.datasets.custom import CustomDataset
 import random
+import numpy as np
 # convert dataset annotation to semantic segmentation map
 data_root =sys.argv[1]
 img_dir = 'images'
@@ -15,7 +16,7 @@ ann_dir = 'labels'
 # classes = ('background', 'bridge',)
 classes = ['background'] + ['model_'+str(i) for i in range(1,29)]
 np.random.seed(0)
-palette = [[0,0,0] + [[np.random.randint(0, 255), np.random.randin(0,255), np.random.randint(0, 255)] for i in range(1, 29)]
+palette = [[0,0,0]] + [[np.random.randint(0, 255), np.random.randint(0,255), np.random.randint(0, 255)] for i in range(1, 29)]
 # define class and plaette for better visualization
 
 # split train/val set randomly
@@ -54,7 +55,7 @@ from mmseg.apis import set_random_seed
 # Since we use only one GPU, BN is used instead of SyncBN
 cfg.norm_cfg = dict(type='BN', requires_grad=True)
 cfg.model.decode_head.norm_cfg = dict(type='BN', requires_grad=True)
-use_covnext = True
+use_covnext = False
 cfg.device = 'cuda'
 cfg.model.decode_head.num_classes = len(classes)
 # cfg.model.decode_head.loss_decode.use_sigmoid = True
