@@ -12,8 +12,10 @@ import random
 data_root =sys.argv[1]
 img_dir = 'images'
 ann_dir = 'labels'
-classes = ('background', 'bridge',)
-palette = [[0,0,0], [128, 128, 128]]
+# classes = ('background', 'bridge',)
+classes = ['background'] + ['model_'+str(i) for i in range(1,29)]
+np.random.seed(0)
+palette = [[0,0,0] + [[np.random.randint(0, 255), np.random.randin(0,255), np.random.randint(0, 255)] for i in range(1, 29)]
 # define class and plaette for better visualization
 
 # split train/val set randomly
@@ -43,9 +45,9 @@ class Bridge(CustomDataset):
 
 from mmcv import Config
 cfg =\
-Config.fromfile('configs/convnext/upernet_convnext_tiny_fp16_512x512_160k_ade20k.py')
+Config.fromfile('configs/sem_fpn/fpn_r50_512x512_160k_ade20k.py')
+# Config.fromfile('configs/convnext/upernet_convnext_tiny_fp16_512x512_160k_ade20k.py')
 # Config.fromfile('configs/segformer/segformer_mit-b0_512x512_160k_ade20k.py')
-# Config.fromfile('configs/sem_fpn/fpn_r101_512x512_160k_ade20k.py')
 
 from mmseg.apis import set_random_seed
 
@@ -54,7 +56,7 @@ cfg.norm_cfg = dict(type='BN', requires_grad=True)
 cfg.model.decode_head.norm_cfg = dict(type='BN', requires_grad=True)
 use_covnext = True
 cfg.device = 'cuda'
-cfg.model.decode_head.num_classes = 2
+cfg.model.decode_head.num_classes = len(classes)
 # cfg.model.decode_head.loss_decode.use_sigmoid = True
 cfg.model.decode_head.loss_decode = \
     dict(type='TverskyLoss', loss_weight=1.0)
@@ -104,12 +106,13 @@ cfg.test_pipeline = [
     # dict(type='LoadAnnotations'),
 ]
 if use_covnext:
-    cfg.model.auxiliary_head.num_classes = 2
+    cfg.model.auxiliary_head.num_classes = len(classes)
     cfg.model.test_cfg['crop_size'] = crop_size
     cfg.model.test_cfg['stride'] = (640, 640)
     cfg.model.auxiliary_head.norm_cfg = dict(type='BN', requires_grad=True)
 else:
     cfg.model.test_cfg.mode = 'whole'
+    cfg.model.backbone.norm_cfg = dict(type='BN', requires_grad=True)
 # cfg.model.test_cfg.mode = 'whole'
 
 
@@ -192,7 +195,6 @@ if len(cfg.workflow) == 2:
 model = build_segmentor(cfg.model)
 model.CLASSES = datasets[0].CLASSES
 mmcv.mkdir_or_exist(osp.abspath(cfg.work_dir))
-model = init_segmentor(cfg, 'iter_600.pth')
-# train_segmentor(model, datasets, cfg, distributed=False, validate=True,
-                # meta=dict())
-
+# model = init_segmentor(cfg, 'iter_600.pth')
+train_segmentor(model, datasets, cfg, distributed=False, validate=True,
+                meta=dict())
